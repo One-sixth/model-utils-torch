@@ -7,3 +7,4 @@ from .layers import *
 from .blocks import *
 from .utils import *
 from .optim import *
+from . import image
