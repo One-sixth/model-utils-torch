@@ -18,6 +18,7 @@ class leaky_twice_relu(torch.jit.ScriptModule):
 
 class TwiceLog(torch.jit.ScriptModule):
     __constants__ = ['scale']
+
     def __init__(self, scale=1.):
         super().__init__()
         self.scale = scale
@@ -42,6 +43,7 @@ class TwiceLog(torch.jit.ScriptModule):
 
 class TanhScale(torch.jit.ScriptModule):
     __constants__ = ['scale']
+
     def __init__(self, scale=1.):
         super().__init__()
         self.scale = scale
@@ -53,6 +55,15 @@ class TanhScale(torch.jit.ScriptModule):
         """
         x = torch.tanh(x) * self.scale
         return x
+
+
+class Swish(torch.jit.ScriptModule):
+    def __init__(self):
+        super().__init__()
+
+    @torch.jit.script_method
+    def forward(self, x):
+        return x * x.sigmoid()
 
 
 if __name__ == '__main__':

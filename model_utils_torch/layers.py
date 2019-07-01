@@ -171,7 +171,10 @@ class _base_conv_setting(torch.jit.ScriptModule):
         self.act = act
         self.bias = bias
         self.dila = dila
-        self.pad = get_padding_by_name(ker_sz, pad)
+        if isinstance(pad, str):
+            self.pad = get_padding_by_name(ker_sz, pad)
+        else:
+            self.pad = pad
 
 
 class Conv2D_SN(_base_conv_setting):
@@ -235,12 +238,15 @@ class Conv2D(_base_conv_setting):
 
 
 class DeConv2D(_base_conv_setting):
-    def __init__(self, in_ch, out_ch, ker_sz=3, stride=1, pad='same', act=None, bias=True, groups=1, dila=1, *, use_fixup_init=False, padding_mode='zeros', norm_kwargs={}):
+    def __init__(self, in_ch, out_ch, ker_sz=3, stride=1, pad='same', act=None, bias=True, groups=1, dila=1, *, use_fixup_init=False, padding_mode='zeros', output_padding=None, norm_kwargs={}):
         super().__init__(in_ch, out_ch, ker_sz, stride, pad, act, bias, dila)
+
+        if output_padding is None:
+            output_padding = stride-1
 
         layers = []
         conv = nn.ConvTranspose2d(in_channels=in_ch, out_channels=out_ch, kernel_size=ker_sz, stride=stride,
-                                  padding=self.pad, output_padding=stride-1, dilation=dila, groups=groups,
+                                  padding=self.pad, output_padding=output_padding, dilation=dila, groups=groups,
                                   bias=bias is True, padding_mode=padding_mode)
 
         if use_fixup_init:
