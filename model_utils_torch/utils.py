@@ -37,17 +37,18 @@ def print_params_size2(net):
     params = net.parameters()
     size = 0
     for p in params:
-        if p.dtype in (torch.int8, torch.uint8, torch.bool):
-            ds = 1
-        elif p.dtype in (torch.float16, torch.int16): #, torch.uint16):
-            ds = 2
-        elif p.dtype in (torch.float32, torch.int32): #, torch.uint32):
-            ds = 4
-        elif p.dtype in (torch.float64, torch.int64): #, torch.uint64):
-            ds = 8
-        else:
-            raise RuntimeError('Unknow type', str(p.dtype))
-        size += p.numel() * ds
+        # if p.dtype in (torch.int8, torch.uint8, torch.bool):
+        #     ds = 1
+        # elif p.dtype in (torch.float16, torch.int16): #, torch.uint16):
+        #     ds = 2
+        # elif p.dtype in (torch.float32, torch.int32): #, torch.uint32):
+        #     ds = 4
+        # elif p.dtype in (torch.float64, torch.int64): #, torch.uint64):
+        #     ds = 8
+        # else:
+        #     raise RuntimeError('Unknow type', str(p.dtype))
+        # size += p.numel() * ds
+        size += p.numel() * p.element_size()
     print('params size %f MB' % (size / 1024 / 1024))
     return size
 

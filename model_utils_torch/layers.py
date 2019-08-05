@@ -71,7 +71,7 @@ class UpsamplingConcat(torch.jit.ScriptModule):
 
 
 class Dense(torch.jit.ScriptModule):
-    def __init__(self, in_feat, out_feat, act=None, bias=True, *, norm_layer_kwargs={}):
+    def __init__(self, in_feat, out_feat, act=None, bias=True, *, norm_kwargs={}):
         super().__init__()
 
         layers = []
@@ -79,7 +79,7 @@ class Dense(torch.jit.ScriptModule):
         layers.append(den)
 
         if isinstance(bias, _Callable):
-            layers.append(bias(out_feat, **norm_layer_kwargs))
+            layers.append(bias(out_feat, **norm_kwargs))
 
         if act:
             layers.append(act)
@@ -94,7 +94,7 @@ class Dense(torch.jit.ScriptModule):
 
 class Dense_Group(torch.jit.ScriptModule):
     __constants__ = ['groups', 'dense_group']
-    def __init__(self, in_feat, out_feat, act=None, bias=True, groups=16, *, norm_layer_kwargs={}):
+    def __init__(self, in_feat, out_feat, act=None, bias=True, groups=16, *, norm_kwargs={}):
         super().__init__()
         self.groups = groups
 
@@ -114,7 +114,7 @@ class Dense_Group(torch.jit.ScriptModule):
         layers = []
 
         if isinstance(bias, _Callable):
-            layers.append(bias(out_feat, **norm_layer_kwargs))
+            layers.append(bias(out_feat, **norm_kwargs))
 
         if act:
             layers.append(act)
@@ -138,7 +138,7 @@ class Dense_Group(torch.jit.ScriptModule):
 
 
 class Dense_SN(nn.Module):
-    def __init__(self, in_feat, out_feat, act=None, bias=True, num_itrs=1, *, norm_layer_kwargs={}):
+    def __init__(self, in_feat, out_feat, act=None, bias=True, num_itrs=1, *, norm_kwargs={}):
         super().__init__()
 
         layers = []
@@ -148,7 +148,7 @@ class Dense_SN(nn.Module):
         layers.append(den)
 
         if isinstance(bias, _Callable):
-            layers.append(bias(out_feat, **norm_layer_kwargs))
+            layers.append(bias(out_feat, **norm_kwargs))
         
         if act:
             layers.append(act)
@@ -243,6 +243,8 @@ class DeConv2D(_base_conv_setting):
 
         if output_padding is None:
             output_padding = stride-1
+        if pad == 'valid':
+            output_padding = 0
 
         layers = []
         conv = nn.ConvTranspose2d(in_channels=in_ch, out_channels=out_ch, kernel_size=ker_sz, stride=stride,
