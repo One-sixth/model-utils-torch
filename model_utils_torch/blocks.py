@@ -199,7 +199,6 @@ class group_block_ed_down(torch.jit.ScriptModule):
         return outputs
 
 
-
 class group_dpn_block(torch.jit.ScriptModule):
     def __init__(self, in_ch, stride, act, channels_increment, groups, block_type, blocks, *, out_ch=None,
                  conv_setting=None, **kwargs):
