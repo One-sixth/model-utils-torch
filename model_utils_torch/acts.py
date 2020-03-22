@@ -2,14 +2,13 @@ import torch
 import torch.nn.functional as F
 
 
-class leaky_twice_relu(torch.jit.ScriptModule):
+class LeakyTwiceRelu(torch.jit.ScriptModule):
     def __init__(self):
         super().__init__()
 
     @torch.jit.script_method
-    def forward(self, x):
+    def forward(self, x: torch.Tensor):
         """
-        :type x: torch.Tensor
         """
         x = torch.where(x > 1, 1 + 0.1 * (x - 1), x)
         x = torch.where(x < 0, 0.1 * x, x)
@@ -32,9 +31,8 @@ class TwiceLog(torch.jit.ScriptModule):
     # x = torch.where(x >= 0, torch.log(x + 1), -1 * torch.log(torch.abs(x - 1)))
     # 第三种实现，当前实现，全程可导，而且导数域一致，忘记x本身就是线性可导了
     @torch.jit.script_method
-    def forward(self, x):
+    def forward(self, x: torch.Tensor):
         """
-        :type x: torch.Tensor
         """
         x = torch.where(x != 0, torch.log(torch.abs(x)+1) * torch.sign(x), x)
         x = x * self.scale
@@ -49,9 +47,8 @@ class TanhScale(torch.jit.ScriptModule):
         self.scale = scale
 
     @torch.jit.script_method
-    def forward(self, x):
+    def forward(self, x: torch.Tensor):
         """
-        :type x: torch.Tensor
         """
         x = torch.tanh(x) * self.scale
         return x
@@ -62,21 +59,5 @@ class Swish(torch.jit.ScriptModule):
         super().__init__()
 
     @torch.jit.script_method
-    def forward(self, x):
+    def forward(self, x: torch.Tensor):
         return x * x.sigmoid()
-
-
-if __name__ == '__main__':
-    a = torch.empty(50).normal_()
-    a.requires_grad = True
-    opt = torch.optim.SGD([a], lr=0.0001)
-    act = TwiceLog()
-    while True:
-        bk = a.clone()
-        b=torch.empty(50).normal_()
-        # b.require_grad = True
-        c=(act(a)-b).abs().mean()
-        c.backward()
-        opt.step()
-        if torch.isnan(a).sum().item() != 0:
-            print('Found nan')

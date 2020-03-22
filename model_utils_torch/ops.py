@@ -1,27 +1,29 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-# from torch.nn.modules import conv, Linear
-# from torch.nn.modules.utils import _pair
-from .utils import *
+
+# from torch.nn import conv, Linear
+# from torch.nn.utils import _pair
+
+# from .utils import *
+
 from typing import Tuple
 
 
 @torch.jit.script
 def channel_shuffle(x, n_group: int):
     """
-    :type n_group: int
-    :type x: torch.Tensor
+    通道扰乱操作
     """
-    n, c, h, w = x.shape
-    x = x.reshape(-1, n_group, c // n_group, h, w)
+    B, C, H, W = x.shape
+    x = x.reshape(-1, n_group, C // n_group, H, W)
     x = x.transpose(1, 2)
-    x = x.reshape(-1, c, h, w)
+    x = x.reshape(-1, C, H, W)
     return x
 
 
-# @torch.jit.script
-def resize_ref(x, shortpoint, method: str='bilinear', align_corners: bool=None):
+@torch.jit.script
+def resize_ref(x, shortpoint, method: str = 'bilinear', align_corners: bool = None):
     """
     :type x: torch.Tensor
     :type shortpoint: torch.Tensor
@@ -36,9 +38,9 @@ def resize_ref(x, shortpoint, method: str='bilinear', align_corners: bool=None):
 
 
 @torch.jit.script
-def add_coord(x):
+def add_coord(x: torch.Tensor):
     """
-    :type x: torch.Tensor
+    增加两层坐标层
     """
     b, c, h, w = x.shape
 
@@ -55,7 +57,7 @@ def add_coord(x):
 
 
 @torch.jit.script
-def pixelwise_norm(x, eps: float=1e-8):
+def pixelwise_norm(x, eps: float = 1e-8):
     """
     Pixelwise feature vector normalization.
     :param x: input activations volume
@@ -67,8 +69,6 @@ def pixelwise_norm(x, eps: float=1e-8):
 
 @torch.jit.script
 def flatten(x):
-    """
-    """
     y = x.reshape(x.shape[0], -1)
     return y
 
@@ -90,31 +90,15 @@ def adaptive_instance_normalization(content_feat, style_feat):
 
 
 # mod from https://github.com/NVlabs/stylegan/blob/master/training/networks_stylegan.py
-# # @torch.jit.script
-# def minibatch_stddev(x, group_size: int=4, num_new_features: int=1):
-#     group_size = group_size if group_size < x.shape[0] else x.shape[0]  # Minibatch must be divisible by (or smaller than) group_size.
-#     s = x.shape                                             # [NCHW]  Input shape.
-#     y = x.reshape(group_size, -1, num_new_features, s[1]//num_new_features, s[2], s[3])   # [GMncHW] Split minibatch into M groups of size G. Split channels into n channel groups c.
-#     # y = tf.cast(y, tf.float32)                              # [GMncHW] Cast to FP32.
-#     y -= y.mean(dim=0, keepdim=True)                        # [GMncHW] Subtract mean over group.
-#     y = y.pow(2).mean(dim=0)                                # [MncHW]  Calc variance over group.
-#     y = (y + 1e-8).sqrt()                                   # [MncHW]  Calc stddev over group.
-#     y = y.mean(dim=(2,3,4), keepdim=True)                   # [Mn111]  Take average over fmaps and pixels.
-#     y = y.mean(dim=2)                                       # [Mn11] Split channels into c channel groups
-#     # y = tf.cast(y, x.dtype)                                 # [Mn11]  Cast back to original data type.
-#     y = y.repeat(group_size, 1, s[2], s[3])                 # [NnHW]  Replicate over group and pixels.
-#     return torch.cat((x, y), dim=1)                         # [NCHW]  Append as new fmap.
-
-
 @torch.jit.script
-def minibatch_stddev(x, group_size: int=4, num_new_features: int=1):
+def minibatch_stddev(x, group_size: int = 4, num_new_features: int = 1, eps: float = 1e-8):
     group_size = group_size if group_size < x.shape[0] else x.shape[0]
     s = x.shape
-    y = x.reshape(group_size, -1, num_new_features, s[1]//num_new_features, s[2], s[3])
+    y = x.reshape(group_size, -1, num_new_features, s[1] // num_new_features, s[2], s[3])
     y = y - y.mean(dim=0, keepdim=True)
     y = y.pow(2).mean(dim=0)
-    y = (y + 1e-8).sqrt()
-    y = y.mean(dim=(2,3,4), keepdim=True)
+    y = (y + eps).sqrt()
+    y = y.mean(dim=(2, 3, 4), keepdim=True)
     y = y.mean(dim=2)
     y = y.repeat(group_size, 1, s[2], s[3])
     return torch.cat((x, y), dim=1)
@@ -126,9 +110,9 @@ def pixelshuffle(x: torch.Tensor, factor_hw: Tuple[int, int]):
     pW = factor_hw[1]
     y = x
     B, iC, iH, iW = y.shape
-    oC, oH, oW = iC//(pH*pW), iH*pH, iW*pW
+    oC, oH, oW = iC // (pH * pW), iH * pH, iW * pW
     y = y.reshape(B, oC, pH, pW, iH, iW)
-    y = y.permute(0, 1, 4, 2, 5, 3)     # B, oC, iH, pH, iW, pW
+    y = y.permute(0, 1, 4, 2, 5, 3)  # B, oC, iH, pH, iW, pW
     y = y.reshape(B, oC, oH, oW)
     return y
 
@@ -139,8 +123,8 @@ def pixelshuffle_invert(x: torch.Tensor, factor_hw: Tuple[int, int]):
     pW = factor_hw[1]
     y = x
     B, iC, iH, iW = y.shape
-    oC, oH, oW = iC*(pH*pW), iH//pH, iW//pW
+    oC, oH, oW = iC * (pH * pW), iH // pH, iW // pW
     y = y.reshape(B, iC, oH, pH, oW, pW)
-    y = y.permute(0, 1, 3, 5, 2, 4)     # B, iC, pH, pW, oH, oW
+    y = y.permute(0, 1, 3, 5, 2, 4)  # B, iC, pH, pW, oH, oW
     y = y.reshape(B, oC, oH, oW)
     return y
