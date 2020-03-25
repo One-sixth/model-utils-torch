@@ -26,3 +26,6 @@ class TestActs(unittest.TestCase):
 
     def test_Swish(self):
         self.fuzzy_check_nan(Swish())
+
+    def test_SwishMemoryEfficient(self):
+        self.fuzzy_check_nan(SwishMemoryEfficient())

@@ -1,4 +1,6 @@
 import torch
+import torch.jit
+import torch.nn as nn
 import torch.nn.functional as F
 
 
@@ -54,10 +56,31 @@ class TanhScale(torch.jit.ScriptModule):
         return x
 
 
-class Swish(torch.jit.ScriptModule):
-    def __init__(self):
-        super().__init__()
+# Copy from https://github.com/lukemelas/EfficientNet-PyTorch/blob/master/efficientnet_pytorch/utils.py#L36.
+class SwishMemoryEfficientFunction(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, x):
+        ctx.save_for_backward(x)
+        y = x * torch.sigmoid(x)
+        return y
 
+    @staticmethod
+    def backward(ctx, grad_outputs):
+        x = ctx.saved_tensors[0]
+        sigmoid_x = torch.sigmoid(x)
+        return grad_outputs * (sigmoid_x * (1 + x * (1 - sigmoid_x)))
+
+
+class SwishMemoryEfficient(nn.Module):
+    '''
+    据说相比原始实现可以增加30%的批量大小，但不支持jit
+    建议在训练时使用 SwishMemoryEfficient，导出jit模型时使用 Swish
+    '''
+    def forward(self, x):
+        return SwishMemoryEfficientFunction.apply(x)
+
+
+class Swish(torch.jit.ScriptModule):
     @torch.jit.script_method
     def forward(self, x: torch.Tensor):
         return x * x.sigmoid()
