@@ -13,6 +13,9 @@ class TestImage(unittest.TestCase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+    def _check_grad_nan(self, a: torch.Tensor):
+        self.assertTrue(torch.isnan(a.grad).sum().item() == 0, 'Found nan!')
+
     def test_color(self):
         im = cv2.imread('data/test_img1.jpg', 1)
         im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
@@ -48,6 +51,58 @@ class TestImage(unittest.TestCase):
 
         print(loss.item())
         print(loss2.item())
+
+    def test_ssim_nan(self):
+        print('Test nan')
+        losser1 = SSIM(data_range=255.).cuda()
+        losser2 = MS_SSIM(data_range=255.).cuda()
+        losser3 = SSIM(data_range=1.).cuda()
+        losser4 = MS_SSIM(data_range=1.).cuda()
+
+        for _ in range(500):
+            im1 = torch.randint(0, 255, (10, 3, 256, 256), dtype=torch.float32, device='cuda')
+            im2 = torch.randint(0, 255, (10, 3, 256, 256), dtype=torch.float32, device='cuda')
+            # im2 = torch.zeros(10, 3, 256, 256, dtype=torch.float32, device='cuda')
+            im3 = im1 / 255.
+            im4 = im2 / 255.
+            im1.requires_grad = True
+            im2.requires_grad = True
+            im3.requires_grad = True
+            im4.requires_grad = True
+
+            # for data_range 255
+            loss = losser1(im1, im2).mean()
+            loss.backward()
+            self.assertTrue(torch.isnan(loss).sum() == 0, 'Found nan!')
+            self._check_grad_nan(im1)
+            self._check_grad_nan(im2)
+            del im1.grad
+            del im2.grad
+
+            loss = losser2(im1, im2).mean()
+            loss.backward()
+            self.assertTrue(torch.isnan(loss).sum() == 0, 'Found nan!')
+            self._check_grad_nan(im1)
+            self._check_grad_nan(im2)
+            del im1.grad
+            del im2.grad
+
+            # for data_range 1.
+            loss = losser3(im3, im4).mean()
+            loss.backward()
+            self.assertTrue(torch.isnan(loss).sum() == 0, 'Found nan!')
+            self._check_grad_nan(im3)
+            self._check_grad_nan(im4)
+            del im3.grad
+            del im4.grad
+
+            loss = losser4(im3, im4).mean()
+            loss.backward()
+            self.assertTrue(torch.isnan(loss).sum() == 0, 'Found nan!')
+            self._check_grad_nan(im3)
+            self._check_grad_nan(im4)
+            del im3.grad
+            del im4.grad
 
     def test_ssim_training(self):
         print('Training Test')

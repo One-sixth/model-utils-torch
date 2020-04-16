@@ -14,7 +14,6 @@ import numpy as np
 class LinearBnAct(nn.Module):
     def __init__(self, in_feat, out_feat, act, eps=1e-8, mom=0.9):
         super().__init__()
-        print('Warning! Please copy me to your code. This only template.')
         self.lin = nn.Linear(in_feat, out_feat, bias=False)
         self.norm = nn.BatchNorm1d(out_feat, eps=eps, momentum=mom)
         self.act = act
