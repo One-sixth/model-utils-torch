@@ -145,7 +145,7 @@ class TestImage(unittest.TestCase):
             ssim_score = loss.item()
             optim.step()
             r_im = np.transpose(rand_im.detach().cpu().numpy().clip(0, 1) * 255, [0, 2, 3, 1]).astype(np.uint8)[0]
-            r_im = cv2.putText(r_im, 'ssim %f' % ssim_score, (10, 30), cv2.FONT_HERSHEY_PLAIN, 2, (255, 0, 0), 2)
+            r_im = cv2.putText(cv2.UMat(r_im), 'ssim %f' % ssim_score, (10, 30), cv2.FONT_HERSHEY_PLAIN, 2, (255, 0, 0), 2).get()
 
             if out_test_video:
                 if time.perf_counter() - video_last_time > 1. / fps:
@@ -189,7 +189,7 @@ class TestImage(unittest.TestCase):
             ssim_score = loss.item()
             optim.step()
             r_im = np.transpose(rand_im.detach().cpu().numpy().clip(0, 1) * 255, [0, 2, 3, 1]).astype(np.uint8)[0]
-            r_im = cv2.putText(r_im, 'ms_ssim %f' % ssim_score, (10, 30), cv2.FONT_HERSHEY_PLAIN, 2, (255, 0, 0), 2)
+            r_im = cv2.putText(cv2.UMat(r_im), 'ms_ssim %f' % ssim_score, (10, 30), cv2.FONT_HERSHEY_PLAIN, 2, (255, 0, 0), 2).get()
 
             if out_test_video:
                 if time.perf_counter() - video_last_time > 1. / fps:
