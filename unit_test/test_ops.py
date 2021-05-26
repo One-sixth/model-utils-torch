@@ -1,4 +1,8 @@
 import unittest
+
+import torch
+import math
+
 from model_utils_torch.ops import *
 
 
@@ -52,3 +56,20 @@ class TestOps(unittest.TestCase):
         y = pixelshuffle_invert(x, (2, 2))
         b = torch.equal(a, y)
         self.assertTrue(b)
+
+    def test_one_hot(self):
+        # dim == -1
+        a = torch.randint(0, 100, [100, 100, 10])
+        arr = one_hot(a, 100, dtype=torch.long)
+        restruct_a = one_hot_invert(arr)
+        b = torch.all(a == restruct_a)
+        self.assertTrue(b)
+
+        # dim != -1
+        a = torch.randint(0, 100, [100, 100, 10])
+        arr = one_hot(a, 100, dim=1, dtype=torch.long)
+        restruct_a = one_hot_invert(arr, dim=1)
+        b = torch.all(a == restruct_a)
+        self.assertTrue(b)
+
+    test_one_hot_invert = test_one_hot

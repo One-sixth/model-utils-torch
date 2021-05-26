@@ -128,3 +128,37 @@ def pixelshuffle_invert(x: torch.Tensor, factor_hw: Tuple[int, int]):
     y = y.permute(0, 1, 3, 5, 2, 4)  # B, iC, pH, pW, oH, oW
     y = y.reshape(B, oC, oH, oW)
     return y
+
+
+@torch.jit.script
+def one_hot(class_array: torch.Tensor, class_num: int, dim: int = -1, dtype: torch.dtype = torch.int32):
+    '''
+    可将[D1, D2, D3, ..., DN] 矩阵转换为 [D1, D2, ..., DN, D(N+1)] 的独热矩阵
+    :param class_array: [D1, D2, ..., DN] 类别矩阵
+    :param class_num:   类别数量
+    :param dim:
+    :param dtype:
+    :return: y => onehot array
+    '''
+    a = torch.arange(class_num, dtype=torch.int32, device=class_array.device)
+    for _ in range(class_array.ndim):
+        a = torch.unsqueeze(a, 0)
+    b = (class_array[..., None] == a).to(dtype)
+    if dim != -1:
+        b = torch.movedim(b, -1, dim)
+    return b
+
+
+@torch.jit.script
+def one_hot_invert(onehot_array, dim: int = -1, dtype: torch.dtype = torch.int32):
+    '''
+    上面one_hot的逆操作
+    可将[D1, D2, D3, ..., DN] 的独热矩阵转换为 [D1, D2, ..., D(N-1)] 的类别矩阵
+    :param onehot_array: [D1, D2, ..., DN] 独热矩阵
+    :param dim:
+    :param dtype:
+    :return: y => class array
+    '''
+    class_arr = torch.max(onehot_array, dim)[1]
+    class_arr = class_arr.to(dtype)
+    return class_arr
