@@ -1,6 +1,9 @@
 '''
 改自 https://github.com/switchablenorms/Switchable-Normalization/blob/master/devkit/ops/switchable_norm.py
 SwitchableNorm 和 SwitchableNorm1D 可能会有点问题，这里的IN就是他们自身。
+
+2021-9-12
+修改了几句，使其兼容 torch.jit.script
 '''
 
 import torch
@@ -47,7 +50,7 @@ class SwitchableNormND(nn.Module):
     def forward(self, x):
         self._check_input_dim(x)
         B, C = x.shape[:2]
-        shape2 = x.shape[2:]
+        shape2 = list(x.shape[2:])
 
         x = x.reshape(B, C, -1)
 
@@ -73,6 +76,10 @@ class SwitchableNormND(nn.Module):
             else:
                 mean_bn = self.running_mean
                 var_bn = self.running_var
+        else:
+            # 本段用于兼容 torch.jit.script，实际无任何作用
+            mean_bn = torch.zeros(1, device=x.device)
+            var_bn = torch.zeros(1, device=x.device)
 
         mean_weight = torch.softmax(self.mean_weight, 0)
         var_weight = torch.softmax(self.var_weight, 0)
@@ -86,7 +93,7 @@ class SwitchableNormND(nn.Module):
 
         x = (x - mean) / (var + self.eps).sqrt()
         x = x * self.weight + self.bias
-        x = x.reshape(B, C, *shape2)
+        x = x.reshape([B, C] + shape2)
         return x
 
 

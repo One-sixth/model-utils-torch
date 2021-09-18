@@ -36,6 +36,18 @@ def print_params_size(module):
     return size
 
 
+
+def print_buffers_size(module):
+    buffers = module.buffers()
+    size = 0
+    count = 0
+    for p in buffers:
+        size += p.numel() * p.element_size()
+        count += p.numel()
+    print('buffers count {} size {} MB'.format(count, size / 1024 / 1024))
+    return size
+
+
 # from torch.nn.modules.utils import _pair
 def _pair(ker_sz):
     if isinstance(ker_sz, int):

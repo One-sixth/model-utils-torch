@@ -15,10 +15,11 @@ def channel_shuffle(x, n_group: int):
     """
     通道扰乱操作
     """
-    B, C, H, W = x.shape
-    x = x.reshape(-1, n_group, C // n_group, H, W)
+    B, C = x.shape[:2]
+    shape2 = list(x.shape[2:])
+    x = x.reshape([B, n_group, C // n_group] + shape2)
     x = x.transpose(1, 2)
-    x = x.reshape(-1, C, H, W)
+    x = x.reshape([B, C] + shape2)
     return x
 
 
