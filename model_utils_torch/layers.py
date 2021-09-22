@@ -97,6 +97,21 @@ class LinearGroup(torch.jit.ScriptModule):
         return y
 
 
+class AdaptiveGemPool(torch.jit.ScriptModule):
+    __constants__ = ['dim', 'eps', 'keepdim']
+
+    def __init__(self, dim=(2, 3), p=3, eps=1e-6, keepdim=False):
+        super().__init__()
+        self.dim = dim
+        self.eps = eps
+        self.keepdim = keepdim
+        self.p = nn.Parameter(torch.ones(1) * p)
+
+    @torch.jit.script_method
+    def forward(self, x):
+        return x.clamp(min=self.eps).pow(self.p).mean(self.dim, keepdim=self.keepdim).pow(1. / self.p)
+
+
 # class OctConv2D(_base_conv_setting):
 #     def __init__(self, in_ch, out_ch, ker_sz=3, stride=1, pad='same', act=None, bias=True, groups=1, dila=1, alpha=(0.5, 0.5), *, use_fixup_init=False, norm_kwargs={}):
 #         super().__init__(in_ch, out_ch, ker_sz, stride, pad, act, bias, dila)
