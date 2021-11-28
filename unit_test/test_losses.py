@@ -6,7 +6,7 @@ import math
 from model_utils_torch.losses import *
 
 
-class TestOps(unittest.TestCase):
+class TestLosses(unittest.TestCase):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
