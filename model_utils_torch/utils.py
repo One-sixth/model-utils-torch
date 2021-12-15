@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.utils
 from typing import List, Union, Iterable
+from contextlib import contextmanager
 
 
 def get_padding_by_name(ker_sz, name='same'):
@@ -71,3 +72,55 @@ def weight_clip_(net_or_params: Union[nn.Module, List], range=(-1, 1), end_with_
                 p.clamp_(range[0], range[1])
         else:
             raise AssertionError('weight_clip: Unsupport type')
+
+
+def module_weight_ema(ema_m: nn.Module, ref_m: nn.Module, decay=0.9999):
+    '''
+    对模型权重进行 指数移动平均值 操作
+
+    来自：https://github.com/basiclab/GNGAN-PyTorch/blob/master/utils.py#L36
+
+    :param ema_m: 要滑动更新的模型，一般指更新很慢的模型
+    :param ref_m: 引用模型，一般指更新很快的那个模型
+    :param decay: 滑动率，值越大，滑动得越慢，范围是 [0, 1]
+    :return:
+    '''
+    assert 0 <= decay <= 1
+    ref_dict = ref_m.state_dict()
+    ema_dict = ema_m.state_dict()
+    for key in ref_dict.keys():
+        ema_dict[key].data.copy_(
+            ema_dict[key].data * decay +
+            ref_dict[key].data * (1 - decay)
+        )
+
+
+@contextmanager
+def module_param_no_grad(m: nn.Module):
+    '''
+    用于阻止模块内的变量记录梯度，可以节省少量的显存和计算时间
+    离开作用域后自动恢复
+
+    使用方法:
+    net = ...
+    with module_no_grad(net):
+        # 此时 net 内所有 params 的 requires_grad 将会设为False
+        y = net(x)
+    # 离开作用域，此时 net 内所有 params 的 requires_grad 将会恢复原来的设定
+
+    来自：https://github.com/basiclab/GNGAN-PyTorch/blob/master/utils.py#L46
+
+    :param m:
+    :return:
+    '''
+    # 记录原始 requires_grad 设定
+    requires_grad_dict = dict()
+    for name, param in m.named_parameters():
+        requires_grad_dict[name] = param.requires_grad
+        param.requires_grad_(False)
+    # 进入with作用域
+    yield m
+    # 离开with作用域
+    # 恢复原始 requires_grad 设定
+    for name, param in m.named_parameters():
+        param.requires_grad_(requires_grad_dict[name])

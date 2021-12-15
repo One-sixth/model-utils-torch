@@ -89,7 +89,7 @@ class LinearGroup(torch.jit.ScriptModule):
     def forward(self, x):
         ys = torch.chunk(x, self.groups, 1)
         out_ys = []
-        for i in range(len(ys)):
+        for i in range(self.groups):
             out_ys.append(F.linear(ys[i], self.weight[i]))
         y = torch.cat(out_ys, 1)
         if self.use_bias:
@@ -111,6 +111,36 @@ class AdaptiveGemPool(torch.jit.ScriptModule):
     def forward(self, x):
         return x.clamp(min=self.eps).pow(self.p).mean(self.dim, keepdim=self.keepdim).pow(1. / self.p)
 
+
+class Reshape(torch.jit.ScriptModule):
+    __constants__ = ['shape']
+
+    def __init__(self, new_shape):
+        super().__init__()
+        self.shape = tuple(int(i) for i in new_shape)
+
+    @torch.jit.script_method
+    def forward(self, x):
+        return x.reshape(self.shape)
+
+    def extra_repr(self):
+        return "{shape}".format(**self.__dict__)
+    
+    
+class InstanceReshape(torch.jit.ScriptModule):
+    __constants__ = ['shape']
+
+    def __init__(self, new_shape):
+        super().__init__()
+        self.shape = tuple(int(i) for i in new_shape)
+
+    @torch.jit.script_method
+    def forward(self, x):
+        new_shape = (x.shape[0],) + self.shape
+        return x.reshape(new_shape)
+
+    def extra_repr(self):
+        return "{shape}".format(**self.__dict__)
 
 # class OctConv2D(_base_conv_setting):
 #     def __init__(self, in_ch, out_ch, ker_sz=3, stride=1, pad='same', act=None, bias=True, groups=1, dila=1, alpha=(0.5, 0.5), *, use_fixup_init=False, norm_kwargs={}):
