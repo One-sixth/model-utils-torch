@@ -2,16 +2,21 @@
 改自 https://github.com/switchablenorms/Switchable-Normalization/blob/master/devkit/ops/switchable_norm.py
 SwitchableNorm 和 SwitchableNorm1D 可能会有点问题，这里的IN就是他们自身。
 
+2021-12-21
+变更 momentum 参数定义，现在定义与nn.BatchNorm一致，值越小，更新就越慢
+修改参数 zero_gamma 和 affine 到 gamma_init 和 bias_init，自定义能力加强
+
 2021-9-12
 修改了几句，使其兼容 torch.jit.script
 '''
 
 import torch
 import torch.nn as nn
+import math
 
 
 class SwitchableNormND(nn.Module):
-    def __init__(self, N, num_features, eps=1e-8, momentum=0.9, using_moving_average=True, using_bn=True, last_gamma=False):
+    def __init__(self, N, num_features, eps=1e-8, momentum=0.1, using_moving_average=True, using_bn=True, gamma_init=1., bias_init=0.):
         super().__init__()
         assert N >= 0
         self.N = N
@@ -19,9 +24,18 @@ class SwitchableNormND(nn.Module):
         self.momentum = momentum
         self.using_moving_average = using_moving_average
         self.using_bn = using_bn
-        self.last_gamma = last_gamma
-        self.weight = nn.Parameter(torch.ones(1, num_features, 1), True)
-        self.bias = nn.Parameter(torch.zeros(1, num_features, 1), True)
+        self.gamma_init = gamma_init
+        self.bias_init = bias_init
+
+        if gamma_init is not None:
+            self.weight = nn.Parameter(torch.full([1, num_features, 1], gamma_init), True)
+        else:
+            self.register_buffer('weight', None)
+
+        if bias_init is not None:
+            self.bias = nn.Parameter(torch.full([1, num_features, 1], bias_init), True)
+        else:
+            self.register_buffer('bias', None)
 
         weight_num = 2 + (1 if using_bn else 0)
         self.mean_weight = nn.Parameter(torch.ones(weight_num), True)
@@ -30,18 +44,9 @@ class SwitchableNormND(nn.Module):
         if self.using_bn:
             self.register_buffer('running_mean', torch.zeros(1, num_features, 1))
             self.register_buffer('running_var', torch.zeros(1, num_features, 1))
-
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        if self.using_bn:
-            self.running_mean.zero_()
-            self.running_var.zero_()
-        if self.last_gamma:
-            self.weight.data.fill_(0)
         else:
-            self.weight.data.fill_(1)
-        self.bias.data.zero_()
+            self.register_buffer('running_mean', None)
+            self.register_buffer('running_var', None)
 
     def _check_input_dim(self, input):
         if input.ndim-2 != self.N:
@@ -51,28 +56,48 @@ class SwitchableNormND(nn.Module):
         self._check_input_dim(x)
         B, C = x.shape[:2]
         shape2 = list(x.shape[2:])
+        # N 个像素
+        if x.ndim == 2:
+            N = 1
+        else:
+            N = math.prod(shape2)
 
-        x = x.reshape(B, C, -1)
+        x = x.reshape(B, C, N)
 
-        mean_in = x.mean(2, keepdim=True)
-        var_in = x.var(2, keepdim=True)
+        if N >= 2:
+            mean_in = x.mean(2, keepdim=True)
+            var_in = x.var(2, keepdim=True)
+        else:
+            # 如果 N 小于2，则IN无意义
+            mean_in = torch.zeros(1, device=x.device)
+            var_in = torch.ones(1, device=x.device)
 
-        mean_ln = mean_in.mean(1, keepdim=True)
-        temp = var_in + mean_in ** 2
-        var_ln = temp.mean(1, keepdim=True) - mean_ln ** 2
+        if C*N >= 2:
+            mean_ln = x.mean([1, 2], keepdim=True)
+            var_ln = x.var([1, 2], keepdim=True)
+        else:
+            # 如果 N*C 小于2，则LN无意义
+            mean_ln = torch.zeros(1, device=x.device)
+            var_ln = torch.ones(1, device=x.device)
 
         if self.using_bn:
             if self.training:
-                mean_bn = mean_in.mean(0, keepdim=True)
-                var_bn = temp.mean(0, keepdim=True) - mean_bn ** 2
-                if self.using_moving_average:
-                    self.running_mean.mul_(self.momentum)
-                    self.running_mean.add_((1 - self.momentum) * mean_bn.data)
-                    self.running_var.mul_(self.momentum)
-                    self.running_var.add_((1 - self.momentum) * var_bn.data)
+                # 如果 B*C 小于2，则BN无意义
+                if B*C >= 2:
+                    mean_bn = x.mean([0, 2], keepdim=True)
+                    var_bn = x.var([0, 2], keepdim=True)
                 else:
-                    self.running_mean.add_(mean_bn.data)
-                    self.running_var.add_(mean_bn.data ** 2 + var_bn.data)
+                    mean_bn = torch.zeros(1, device=x.device)
+                    var_bn = torch.ones(1, device=x.device)
+
+                if self.using_moving_average:
+                    self.running_mean.mul_(1 - self.momentum)
+                    self.running_mean.add_(self.momentum * mean_bn.data)
+                    self.running_var.mul_(1 - self.momentum)
+                    self.running_var.add_(self.momentum * var_bn.data)
+                else:
+                    self.running_mean.set_(mean_bn.data)
+                    self.running_var.set_(var_bn.data)
             else:
                 mean_bn = self.running_mean
                 var_bn = self.running_var
@@ -91,27 +116,32 @@ class SwitchableNormND(nn.Module):
             mean = mean_weight[0] * mean_in + mean_weight[1] * mean_ln
             var = var_weight[0] * var_in + var_weight[1] * var_ln
 
-        x = (x - mean) / (var + self.eps).sqrt()
-        x = x * self.weight + self.bias
+        x = (x - mean) * (var + self.eps).rsqrt()
+
+        if self.weight is not None:
+            x = x * self.weight
+        if self.bias:
+            x = x + self.bias
+
         x = x.reshape([B, C] + shape2)
         return x
 
 
 class SwitchableNorm(SwitchableNormND):
-    def __init__(self, num_features, eps=1e-8, momentum=0.9, using_moving_average=True, using_bn=True, last_gamma=False):
-        super().__init__(0, num_features, eps, momentum, using_moving_average, using_bn, last_gamma)
+    def __init__(self, *args, **kwargs):
+        super().__init__(0, *args, **kwargs)
 
 
 class SwitchableNorm1D(SwitchableNormND):
-    def __init__(self, num_features, eps=1e-8, momentum=0.9, using_moving_average=True, using_bn=True, last_gamma=False):
-        super().__init__(1, num_features, eps, momentum, using_moving_average, using_bn, last_gamma)
+    def __init__(self, *args, **kwargs):
+        super().__init__(1, *args, **kwargs)
 
 
 class SwitchableNorm2D(SwitchableNormND):
-    def __init__(self, num_features, eps=1e-8, momentum=0.9, using_moving_average=True, using_bn=True, last_gamma=False):
-        super().__init__(2, num_features, eps, momentum, using_moving_average, using_bn, last_gamma)
+    def __init__(self, *args, **kwargs):
+        super().__init__(2, *args, **kwargs)
 
 
 class SwitchableNorm3D(SwitchableNormND):
-    def __init__(self, num_features, eps=1e-8, momentum=0.9, using_moving_average=True, using_bn=True, last_gamma=False):
-        super().__init__(3, num_features, eps, momentum, using_moving_average, using_bn, last_gamma)
+    def __init__(self, *args, **kwargs):
+        super().__init__(3, *args, **kwargs)
