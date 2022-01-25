@@ -1,5 +1,7 @@
 import unittest
-from model_utils_torch.layers import *
+from model_utils_torch import *
+from model_utils_torch.more_layers.softmax_free_attention import test_softmax_free_attention
+from model_utils_torch.more_layers.multi_head_attention import test_multi_head_attention
 
 
 class TestLayers(unittest.TestCase):
@@ -58,3 +60,11 @@ class TestLayers(unittest.TestCase):
         m = SwitchableNorm3D(10)
         y = m(self.test_data_3d)
         self.assertEqual((5, 10, 16, 16, 16), tuple(y.shape))
+
+    def test_softmax_free_attention(self):
+        b = test_softmax_free_attention()
+        self.assertTrue(b)
+
+    def test_multi_head_attention(self):
+        b = test_multi_head_attention()
+        self.assertTrue(b)

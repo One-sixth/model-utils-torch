@@ -8,6 +8,10 @@ import torch.nn.functional as F
 # from .utils import *
 
 from typing import Tuple
+try:
+    from .more_ops import *
+except (ModuleNotFoundError, ImportError):
+    from more_ops import *
 
 
 @torch.jit.script

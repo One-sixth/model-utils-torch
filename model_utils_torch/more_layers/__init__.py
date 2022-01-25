@@ -1,2 +1,4 @@
-from .criss_cross_attention import CrissCrossAttention
-from .switchable_norm import SwitchableNorm, SwitchableNorm1D, SwitchableNorm2D, SwitchableNorm3D, SwitchableNormND
+from .criss_cross_attention import *
+from .multi_head_attention import *
+from .softmax_free_attention import *
+from .switchable_norm import *

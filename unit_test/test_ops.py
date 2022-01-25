@@ -4,6 +4,7 @@ import torch
 import math
 
 from model_utils_torch.ops import *
+from model_utils_torch.more_ops.multiple_pad import test_center_multiple_pad
 
 
 class TestOps(unittest.TestCase):
@@ -73,3 +74,8 @@ class TestOps(unittest.TestCase):
         self.assertTrue(b)
 
     test_one_hot_invert = test_one_hot
+
+    def test_multiple_pad(self):
+        b = test_center_multiple_pad()
+        self.assertTrue(b)
+

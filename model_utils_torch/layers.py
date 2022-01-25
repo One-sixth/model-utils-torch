@@ -15,10 +15,14 @@ import math
 from typing import Iterable as _Iterable
 from typing import Callable as _Callable
 
-from . import ops
-from . import utils
-from .more_layers import *
-
+try:
+    from . import ops
+    from . import utils
+    from .more_layers import *
+except (ModuleNotFoundError, ImportError):
+    import ops
+    import utils
+    from more_layers import *
 
 '''
 注意写 torch.jit.script 时需要手动添加非 Tensor 参数的注释
@@ -87,11 +91,11 @@ class LinearGroup(torch.jit.ScriptModule):
 
     @torch.jit.script_method
     def forward(self, x):
-        ys = torch.chunk(x, self.groups, 1)
+        ys = torch.chunk(x, self.groups, -1)
         out_ys = []
         for i in range(self.groups):
             out_ys.append(F.linear(ys[i], self.weight[i]))
-        y = torch.cat(out_ys, 1)
+        y = torch.cat(out_ys, -1)
         if self.use_bias:
             y = y + self.bias
         return y

@@ -15,6 +15,9 @@ import torch.nn as nn
 import math
 
 
+__all__ = ['SwitchableNorm', 'SwitchableNorm1D', 'SwitchableNorm2D', 'SwitchableNorm3D', 'SwitchableNormND']
+
+
 class SwitchableNormND(nn.Module):
     def __init__(self, N, num_features, eps=1e-8, momentum=0.1, using_moving_average=True, using_bn=True, gamma_init=1., bias_init=0.):
         super().__init__()
@@ -120,7 +123,7 @@ class SwitchableNormND(nn.Module):
 
         if self.weight is not None:
             x = x * self.weight
-        if self.bias:
+        if self.bias is not None:
             x = x + self.bias
 
         x = x.reshape([B, C] + shape2)
