@@ -2,8 +2,9 @@
 代码来自 https://github.com/fudan-zvg/SOFT/blob/master/models/softmax_free_transformer.py
 大幅度精简了代码
 
-本注意力方法有优势，占用显存与原始注意力方法一致，但效果更优
-一般mode=0就够了
+占用显存与原始注意力方法一致，效果与原始多头注意力层相似，但在大学习率1e-3情况下不稳定，验证集准确率受学习率影响较大
+一般mode=0就行了
+mode=1用于QKV长度不一致的情况，目前未考虑QKV长度不一致情况。
 '''
 
 import math
