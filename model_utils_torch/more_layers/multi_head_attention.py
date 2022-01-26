@@ -4,6 +4,7 @@
 
 import torch
 import torch.nn as nn
+import math
 
 
 __all__ = ['MultiHeadAttention']
@@ -37,6 +38,8 @@ class MultiHeadAttention(torch.jit.ScriptModule):
         # q,k,v [B,head,L,c]
         attn = q @ k.transpose(2, 3)
         # attn [B,head,L,L]
+        # 需要先缩放注意力矩阵，否则性能会差很多
+        attn = attn / math.sqrt(k.shape[-1])
         attn = attn.softmax(-1)
 
         y = attn @ v
