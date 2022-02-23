@@ -15,10 +15,13 @@ import torch.nn.functional as F
 import numpy as np
 from typing import Iterable, List, Tuple
 
-import os
-import sys
-sys.path.append(os.path.join(os.path.split(os.path.abspath(__file__))[0], '..'))
-from ops import pixelshuffle_invert, pixelshuffle
+if __name__ == '__main__':
+    import os
+    import sys
+    sys.path.append(os.path.join(os.path.split(os.path.abspath(__file__))[0], '..'))
+    from ops import pixelshuffle_invert, pixelshuffle
+else:
+    from ..ops import pixelshuffle_invert, pixelshuffle
 
 
 class RevIdenity(nn.Module):
