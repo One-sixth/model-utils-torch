@@ -2,6 +2,7 @@ import unittest
 from model_utils_torch import *
 from model_utils_torch.more_layers.softmax_free_attention import test_softmax_free_attention
 from model_utils_torch.more_layers.multi_head_attention import test_multi_head_attention
+from model_utils_torch.more_layers.flash_attention import test_flash_attention
 
 
 class TestLayers(unittest.TestCase):
@@ -67,4 +68,8 @@ class TestLayers(unittest.TestCase):
 
     def test_multi_head_attention(self):
         b = test_multi_head_attention()
+        self.assertTrue(b)
+
+    def test_flash_attention(self):
+        b = test_flash_attention()
         self.assertTrue(b)
