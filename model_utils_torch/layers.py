@@ -29,27 +29,62 @@ except (ModuleNotFoundError, ImportError):
 '''
 
 
-class Upsample(torch.jit.ScriptModule):
-    __constants__ = ['size', 'scale_factor', 'mode', 'align_corners', 'name']
+class Interpolate(torch.jit.ScriptModule):
+    '''
+    与Upsample层等价
+    '''
+    __constants__ = ['size', 'scale_factor', 'mode', 'align_corners', 'name', 'recompute_scale_factor']
 
-    def __init__(self, size=None, scale_factor=None, mode='bilinear', align_corners=None):
+    def __init__(self, size=None, scale_factor=None, mode: str='nearest', align_corners=None, recompute_scale_factor=None, antialias=False) -> None:
         super().__init__()
-
-        # scale_factor 不允许是整数，有点坑。。
-        if size is None:
-            if isinstance(scale_factor, _Iterable):
-                scale_factor = tuple([float(i) for i in scale_factor])
-            else:
-                scale_factor = float(scale_factor)
-
+        self.name = type(self).__name__
         self.size = size
-        self.scale_factor = scale_factor
+        if isinstance(scale_factor, tuple):
+            self.scale_factor = tuple(float(factor) for factor in scale_factor)
+        else:
+            self.scale_factor = float(scale_factor) if scale_factor else None
         self.mode = mode
         self.align_corners = align_corners
+        self.recompute_scale_factor = recompute_scale_factor
+        self.antialias = antialias
 
     @torch.jit.script_method
-    def forward(self, x: torch.Tensor):
-        return F.interpolate(x, self.size, self.scale_factor, self.mode, self.align_corners)
+    def forward(self, input: torch.Tensor) -> torch.Tensor:
+        return F.interpolate(input, self.size, self.scale_factor, self.mode, self.align_corners, recompute_scale_factor=self.recompute_scale_factor, antialias=self.antialias)
+
+    def extra_repr(self) -> str:
+        if self.scale_factor is not None:
+            info = 'scale_factor=' + str(self.scale_factor)
+        else:
+            info = 'size=' + str(self.size)
+        info += ', mode=' + self.mode
+        return info
+
+
+# class Upsample(torch.jit.ScriptModule):
+#     __constants__ = ['size', 'scale_factor', 'mode', 'align_corners', 'name']
+#
+#     def __init__(self, size=None, scale_factor=None, mode='bilinear', align_corners=None):
+#         super().__init__()
+#
+#         # scale_factor 不允许是整数，有点坑。。
+#         if size is None:
+#             if isinstance(scale_factor, _Iterable):
+#                 scale_factor = tuple([float(i) for i in scale_factor])
+#             else:
+#                 scale_factor = float(scale_factor)
+#
+#         self.size = size
+#         self.scale_factor = scale_factor
+#         self.mode = mode
+#         self.align_corners = align_corners
+#
+#     @torch.jit.script_method
+#     def forward(self, x: torch.Tensor):
+#         return F.interpolate(x, self.size, self.scale_factor, self.mode, self.align_corners)
+
+
+Upsample = Interpolate
 
 
 class UpsampleConcat(torch.jit.ScriptModule):
