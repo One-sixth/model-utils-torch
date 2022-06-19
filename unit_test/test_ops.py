@@ -79,3 +79,13 @@ class TestOps(unittest.TestCase):
         b = test_center_multiple_pad()
         self.assertTrue(b)
 
+    def test_linspace_grid(self):
+        ys = torch.linspace(-1, 1, 4)
+        xs = torch.linspace(3, 5, 6)
+
+        w = torch.meshgrid([ys, xs])
+        w = torch.stack(w, 0)
+
+        w2 = linspace_grid([4, 6], [-1, 1, 3, 5], 0)
+
+        self.assertTrue(torch.allclose(w, w2))

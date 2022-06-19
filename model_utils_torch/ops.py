@@ -167,3 +167,37 @@ def one_hot_invert(onehot_array, dim: int = -1, dtype: torch.dtype = torch.int32
     class_arr = torch.max(onehot_array, dim)[1]
     class_arr = class_arr.to(dtype)
     return class_arr
+
+
+@torch.jit.script
+def linspace_grid(sizes: list[int], value_ranges: list[float] = (-1., 1.), stack_dim: int = 0):
+    '''
+    可以快速生成一个数字坐标网格
+    :param sizes: 每层的大小
+    :param value_ranges: 支持输入方法 将值域应用到全部层[-1,1] 和 每层均指定特定的值域[-1,1,-1,1,...]
+    :param stack_dim:
+    :return:
+    '''
+
+    # 检查参数sizes
+    sizes = [int(round(s)) for s in sizes]
+    value_ranges = [float(v) for v in value_ranges]
+
+    # 检查参数 value_ranges
+    if len(value_ranges) == 2:
+        value_ranges = value_ranges * len(sizes)
+
+    assert len(value_ranges) == 2 * len(sizes)
+
+    # 开始生成网格
+    ds = []
+    for i in range(len(sizes)):
+        r1 = i * 2
+        r2 = r1 + 1
+        d = torch.linspace(value_ranges[r1], value_ranges[r2], sizes[i])
+        ds.append(d)
+
+    o = torch.meshgrid(ds, indexing='ij')
+    o = torch.stack(o, stack_dim)
+
+    return o
