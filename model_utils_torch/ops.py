@@ -201,3 +201,19 @@ def linspace_grid(sizes: list[int], value_ranges: list[float] = (-1., 1.), stack
     o = torch.stack(o, stack_dim)
 
     return o
+
+
+class _GradScaleOp(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, x, scale):
+        scale = torch.as_tensor(scale, dtype=x.dtype, device=x.device)
+        ctx.save_for_backward(scale)
+        return x
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        s, = ctx.saved_tensors
+        return grad_output * s, None
+
+
+grad_scale = _GradScaleOp.apply
