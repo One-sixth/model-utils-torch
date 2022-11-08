@@ -1,4 +1,8 @@
 '''
+v1.3
+改变optim的结构
+新增Adan优化器
+
 v1.2
 对模块进行重构
 
@@ -26,4 +30,4 @@ from . import image
 from . import rev
 
 
-__version__ = '1.2'
+__version__ = '1.3'
