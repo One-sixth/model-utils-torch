@@ -217,3 +217,51 @@ class _GradScaleOp(torch.autograd.Function):
 
 
 grad_scale = _GradScaleOp.apply
+
+
+@torch.jit.script
+def gen_sinusoidal_position_embedding(len: int, pos_start: int=0, pos_ch: int=2, device: torch.device= 'cpu'):
+    '''
+    sinusoidal_position_embedding 正余弦绝对位置编码
+    :param len:         长度
+    :param pos_start:   起始位置
+    :param pos_ch:      通道数
+    :param device:      设备
+    :return:            输出 Tensor shape [len, pos_ch]
+    '''
+    pos = torch.arange(len, device=device)[:, None].expand(len, pos_ch)
+    pos = pos + pos_start
+    ch_idx = torch.arange(pos_ch, device=device)[None,].expand(len, pos_ch)
+
+    pos_emb = pos / torch.pow(1000, 2 * (ch_idx // 2) / pos_ch)
+
+    torch.sin_(pos_emb[:, 0::2])
+    torch.cos_(pos_emb[:, 1::2])
+
+    # shape [len, pos_ch]
+    return pos_emb
+
+
+@torch.jit.script
+def apply_rotary_position_embedding(x, sin_pos_emb):
+    '''
+    旋转绝对位置编码 rotary_position_embedding
+    该编码是乘性编码，且需要通道间交互
+    要求输入通道数大于2并且为2的倍数
+    :param x:           shape [..., L, C] 输入Tensor
+    :param sin_pos_emb: shape [L, C] 正余弦绝对位置编码，由 gen_sinusoidal_position_embedding 生成
+    :return:
+    '''
+    assert x.shape[-1] % 2 == 0 and x.shape[-1] >= 2, 'Error! The input channels is required to be greater than 2 and a multiple of 2.'
+    sin, cos = sin_pos_emb[..., 0::2], sin_pos_emb[..., 1::2]
+    x1, x2 = x[..., 0::2], x[..., 1::2]
+
+    o1 = x1 * cos - x2 * sin
+    o2 = x2 * cos + x1 * sin
+    # o1,o2 shape [..., L, C//2]
+
+    o = torch.stack([o1, o2], -1)
+    # o shape [..., L, C//2, 2]
+    o = o.flatten(-2)
+    # o shape [..., L, C]
+    return o

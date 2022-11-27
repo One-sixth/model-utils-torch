@@ -4,8 +4,14 @@ FLASH-QUAD注意力层 2
 注意：由于各种变体，改进一直在更新，这里仅提供参考实现。
 为了方便使用新技术，本实现的API并不稳定，请复制本文件到你的项目里面，以确保稳定复现
 
+注意2：FlashQuadCrossAttention 是我根据原FlashQuad设计结合标准的交叉注意力层推出来的，原型没有该设计，不能确定有效性。
+注意3：FlashQuadSelfAttention 与原实现相比，去除了基于序列长度缩放，并且 q_gamma, k_gamma 的初始化方法也做了修改。
+
 增加自注意力层和交叉自注意力层
 https://spaces.ac.cn/archives/8934
+
+参考
+https://github.com/lucidrains/FLASH-pytorch
 '''
 
 import torch

@@ -1,4 +1,7 @@
 '''
+v1.4.1
+新算子 gen_sinusoidal_position_embedding，apply_rotary_position_embedding
+
 v1.4
 新层 FlashQuadSelfAttention，FlashQuadCrossAttention，T5_RelativePositionEmbedding
 新算子 gen_nlp_self_attn_mask，gen_nlp_cross_attn_mask，find_closest_vector_by_L2，find_closest_vector_by_cos
@@ -19,7 +22,7 @@ v1.1
 '''
 
 import torch
-assert torch.__version__ >= '1.3.1'
+assert torch.__version__ >= '1.8.1'
 
 from . import acts
 from . import ops

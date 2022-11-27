@@ -93,3 +93,15 @@ class TestOps(unittest.TestCase):
 
     def test_vector_retrieval(self):
         self.assertTrue(test_find_closest_vector())
+
+    def test_gen_sinusoidal_position_embedding(self):
+        coord = gen_sinusoidal_position_embedding(12, 0, 2, device='cpu')
+        self.assertTrue(True)
+
+    def test_apply_rotary_position_embedding(self):
+        len = 12
+        pos_ch = 6
+        coord = gen_sinusoidal_position_embedding(len, 0, pos_ch, device='cpu')
+        x = torch.randn([2, len, pos_ch])
+        out = apply_rotary_position_embedding(x, coord)
+        self.assertTrue(True)
