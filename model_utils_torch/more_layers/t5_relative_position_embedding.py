@@ -40,7 +40,7 @@ def _calc_rel_pos_bucket(rel_pos: torch.Tensor, bidirectional: bool = True, num_
         rel_buckets = (rel_pos > 0).to(torch.long) * num_buckets
         rel_pos = torch.abs(rel_pos)
     else:
-        rel_buckets = torch.zeros(1, dtype=torch.long)
+        rel_buckets = torch.zeros(1, dtype=torch.long, device=rel_pos.device)
         rel_pos = -torch.min(rel_pos, torch.zeros_like(rel_pos))
     # now rel_pos is in the range [0, inf)
 
