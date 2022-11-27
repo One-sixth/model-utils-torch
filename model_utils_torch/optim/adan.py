@@ -151,6 +151,11 @@ class Adan(Optimizer):
                     # this is only to simplify implementation
                     state['pre_grad'] = p.grad
 
+                # Automatically move param to the appropriate device
+                for k, v in state.items():
+                    if isinstance(v, torch.Tensor) and v.device != p.device:
+                        state[k] = v.to(p.device)
+
                 exp_avgs.append(state['exp_avg'])
                 exp_avg_sqs.append(state['exp_avg_sq'])
                 exp_avg_diffs.append(state['exp_avg_diff'])

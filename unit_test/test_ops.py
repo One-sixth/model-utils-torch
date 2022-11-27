@@ -5,6 +5,7 @@ import math
 
 from model_utils_torch.ops import *
 from model_utils_torch.more_ops.multiple_pad import test_center_multiple_pad
+from model_utils_torch.more_ops.vector_retrieval import test_find_closest_vector
 
 
 class TestOps(unittest.TestCase):
@@ -89,3 +90,6 @@ class TestOps(unittest.TestCase):
         w2 = linspace_grid([4, 6], [-1, 1, 3, 5], 0)
 
         self.assertTrue(torch.allclose(w, w2))
+
+    def test_vector_retrieval(self):
+        self.assertTrue(test_find_closest_vector())

@@ -73,3 +73,41 @@ class TestLayers(unittest.TestCase):
     def test_flash_attention(self):
         b = test_flash_attention()
         self.assertTrue(b)
+
+    def test_flash_attention_2(self):
+        # shape [B,L,C]
+        q = torch.rand([2, 4, 12])
+        k = torch.rand([2, 6, 12])
+
+        q_mask = torch.as_tensor([
+            [1, 1, 1, 1],
+            [1, 1, 0, 0],
+        ], dtype=torch.bool)
+        k_mask = torch.as_tensor([
+            [1, 1, 0, 0, 0, 0],
+            [1, 1, 1, 1, 1, 0],
+        ], dtype=torch.bool)
+
+        k_self_mask = gen_nlp_self_attn_mask(k_mask, True)
+        qk_cross_mask = gen_nlp_cross_attn_mask(q_mask, k_mask, False)
+
+        k_self_mask = torch.where(k_self_mask, 0, -torch.inf)
+        qk_cross_mask = torch.where(qk_cross_mask, 0, -torch.inf)
+
+        self_attn = FlashQuadSelfAttention(12, 12, 24, 8)
+        cross_attn = FlashQuadCrossAttention(12, 12, 24, 8)
+
+        k = self_attn(k, attn_bias=k_self_mask)
+        y = cross_attn(q, k, attn_bias=qk_cross_mask)
+
+        # print(k.shape)
+        # print(y.shape)
+
+        self.assertTrue(True)
+
+    def test_t5_relative_position_embedding(self):
+        m = T5_RelativePositionEmbedding(bidirectional=True)
+        o = m(10, 20)
+        m = T5_RelativePositionEmbedding(bidirectional=False)
+        o = m(10, 20)
+        self.assertTrue(True)
