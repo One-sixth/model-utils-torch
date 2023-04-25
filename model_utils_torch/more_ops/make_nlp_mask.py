@@ -7,7 +7,7 @@ import torch.nn.functional as F
 
 
 @torch.jit.script
-def gen_nlp_self_attn_mask(mask:torch.Tensor, bidirectional:bool):
+def make_nlp_self_attn_mask(mask:torch.Tensor, bidirectional:bool):
     '''
     生成自注意力掩码
     :param mask:            shape [B, L]
@@ -22,7 +22,7 @@ def gen_nlp_self_attn_mask(mask:torch.Tensor, bidirectional:bool):
 
 
 @torch.jit.script
-def gen_nlp_cross_attn_mask(query_mask:torch.Tensor, key_mask:torch.Tensor, bidirectional:bool):
+def make_nlp_cross_attn_mask(query_mask:torch.Tensor, key_mask:torch.Tensor, bidirectional:bool):
     '''
     生成交叉注意力掩码
     :param query_mask:      shape [B, L1]
@@ -51,7 +51,7 @@ if __name__ == '__main__':
         [1, 1, 1, 0, 0, 0],
     ], dtype=torch.bool)
 
-    self_attn_mask_1 = gen_nlp_self_attn_mask(q_mask, True)
-    self_attn_mask_2 = gen_nlp_self_attn_mask(q_mask, False)
-    cross_attn_mask_1 = gen_nlp_cross_attn_mask(q_mask, k_mask, True)
-    cross_attn_mask_2 = gen_nlp_cross_attn_mask(q_mask, k_mask, False)
+    self_attn_mask_1 = make_nlp_self_attn_mask(q_mask, True)
+    self_attn_mask_2 = make_nlp_self_attn_mask(q_mask, False)
+    cross_attn_mask_1 = make_nlp_cross_attn_mask(q_mask, k_mask, True)
+    cross_attn_mask_2 = make_nlp_cross_attn_mask(q_mask, k_mask, False)

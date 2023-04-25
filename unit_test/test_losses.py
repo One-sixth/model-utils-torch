@@ -21,3 +21,14 @@ class TestLosses(unittest.TestCase):
         pred = torch.rand([3, 5, 10, 10])
         label = torch.rand([3, 5, 10, 10])
         self.assertTrue(generalized_dice_loss(pred, label).item() >= 0)
+
+    def test_weighted_and_neg_topk_cross_entropy(self):
+        pred = torch.rand([1, 10])
+        pred[0, 3] += 5
+        label = torch.as_tensor([3], dtype=torch.long)
+        topk = 9
+        tgt_weight = torch.as_tensor([-0.5], dtype=torch.float32)
+        tgt_mask = torch.as_tensor([True], dtype=torch.bool)
+
+        loss = weighted_and_neg_topk_cross_entropy(pred, label, topk, tgt_weight, tgt_mask).item()
+        self.assertTrue(True)

@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from typing import Union
 
 # from torch.nn import conv, Linear
 # from torch.nn.utils import _pair
@@ -220,20 +221,41 @@ grad_scale = _GradScaleOp.apply
 
 
 @torch.jit.script
-def gen_sinusoidal_position_embedding(len: int, pos_start: int=0, pos_ch: int=2, device: torch.device= 'cpu'):
+def make_sinusoidal_position_channel_embedding(pos_ch: int=2, cycle: float=10000., device: torch.device= 'cpu'):
+    '''
+    生成通道嵌入，用于给 make_sinusoidal_position_embedding 加速
+    :param pos_ch:  通道数
+    :param cycle:   周期
+    :param device:  设备
+    :return:
+    '''
+    ch_idx = torch.arange(pos_ch, device=device)
+    ch_emb = torch.pow(cycle, 2 * (ch_idx // 2) / pos_ch)
+    return ch_emb
+
+
+@torch.jit.script
+def make_sinusoidal_position_embedding(len: int, pos_start: int=0, pos_ch: int=2, cycle: float=10000., pos_scale: int=1, device: torch.device= 'cpu',
+                                       ch_emb: Union[None, torch.Tensor]=None):
     '''
     sinusoidal_position_embedding 正余弦绝对位置编码
     :param len:         长度
     :param pos_start:   起始位置
     :param pos_ch:      通道数
+    :param cycle:       周期
+    :param pos_scale:   坐标缩放
     :param device:      设备
+    :param ch_emb:      通道嵌入，由 make_sinusoidal_position_channel_embedding 生成，用于加速。
     :return:            输出 Tensor shape [len, pos_ch]
     '''
-    pos = torch.arange(len, device=device)[:, None].expand(len, pos_ch)
-    pos = pos + pos_start
-    ch_idx = torch.arange(pos_ch, device=device)[None,].expand(len, pos_ch)
+    if ch_emb is None:
+        ch_emb = make_sinusoidal_position_channel_embedding(pos_ch, cycle, device)
+    else:
+        assert ch_emb.ndim == 1 and ch_emb.shape[0] == pos_ch, 'Error! Bad ch_emb shape.'
 
-    pos_emb = pos / torch.pow(1000, 2 * (ch_idx // 2) / pos_ch)
+    # pos = torch.arange(len, device=device).mul(pos_scale).add(pos_start)[:, None]
+    pos = torch.arange(pos_start, pos_scale*len+pos_start, pos_scale, device=device)[:, None]
+    pos_emb = pos / ch_emb[None,]
 
     torch.sin_(pos_emb[:, 0::2])
     torch.cos_(pos_emb[:, 1::2])
@@ -249,7 +271,7 @@ def apply_rotary_position_embedding(x, sin_pos_emb):
     该编码是乘性编码，且需要通道间交互
     要求输入通道数大于2并且为2的倍数
     :param x:           shape [..., L, C] 输入Tensor
-    :param sin_pos_emb: shape [L, C] 正余弦绝对位置编码，由 gen_sinusoidal_position_embedding 生成
+    :param sin_pos_emb: shape [L, C] 正余弦绝对位置编码，由 make_sinusoidal_position_embedding 生成
     :return:
     '''
     assert x.shape[-1] % 2 == 0 and x.shape[-1] >= 2, 'Error! The input channels is required to be greater than 2 and a multiple of 2.'

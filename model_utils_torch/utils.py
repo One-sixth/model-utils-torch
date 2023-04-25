@@ -124,3 +124,23 @@ def module_param_no_grad(m: nn.Module):
     # 恢复原始 requires_grad 设定
     for name, param in m.named_parameters():
         param.requires_grad_(requires_grad_dict[name])
+
+
+def get_optim_cur_lr(optim: torch.optim.Optimizer, reduce='mean'):
+    '''
+    获得优化器当前的学习率
+    :return: 是一个列表，代表每个参数组的学习率
+    '''
+    assert reduce in ('mean', 'sum', 'none'), f'Error! Bad reduce param {reduce}'
+    lrs = []
+    for group in optim.param_groups:
+        lrs.append(group['lr'])
+
+    if reduce == 'mean':
+        lr = sum(lrs) / len(lrs)
+    elif reduce == 'sum':
+        lr = sum(lrs)
+    else:
+        lr = lrs
+
+    return lr

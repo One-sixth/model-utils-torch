@@ -70,7 +70,7 @@ class T5_RelativePositionEmbedding(torch.jit.ScriptModule):
         self.rel_pos_emb = nn.Embedding(self.num_buckets, emb_dim)
 
     @torch.jit.script_method
-    def forward(self, query_L: int, key_L: int):
+    def forward(self, query_L: int, key_L: int, rel_scale:int=1, rel_bias:int=0):
         '''Compute binned relative position bias'''
         device = self.rel_pos_emb.weight.device
 
@@ -78,6 +78,7 @@ class T5_RelativePositionEmbedding(torch.jit.ScriptModule):
         k_pos = torch.arange(key_L, dtype=torch.long, device=device)[None, :]
         # 这里得到相对位置
         rel_pos = k_pos - q_pos  # shape (query_L, key_L)
+        rel_pos = rel_pos * rel_scale + rel_bias
 
         # 通过相对位置获得桶的编号
         rel_pos_bucket = _calc_rel_pos_bucket(

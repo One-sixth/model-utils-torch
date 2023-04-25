@@ -164,8 +164,8 @@ class Reshape(torch.jit.ScriptModule):
 
     def extra_repr(self):
         return "{shape}".format(**self.__dict__)
-    
-    
+
+
 class InstanceReshape(torch.jit.ScriptModule):
     __constants__ = ['shape']
 
@@ -180,86 +180,3 @@ class InstanceReshape(torch.jit.ScriptModule):
 
     def extra_repr(self):
         return "{shape}".format(**self.__dict__)
-
-# class OctConv2D(_base_conv_setting):
-#     def __init__(self, in_ch, out_ch, ker_sz=3, stride=1, pad='same', act=None, bias=True, groups=1, dila=1, alpha=(0.5, 0.5), *, use_fixup_init=False, norm_kwargs={}):
-#         super().__init__(in_ch, out_ch, ker_sz, stride, pad, act, bias, dila)
-#
-#         self.act = act
-#         if act is None:
-#             self.act = Identity()
-#
-#         # 限定输入和输出必定存在高频特征
-#         assert 0. <= np.min(alpha) and np.max(alpha) < 1, "Alphas should be in the interval from 0. to 1."
-#         assert stride == 1 or stride == 2, "now only support stridt equal 1 or 2"
-#         self.downscale = nn.AvgPool2d(kernel_size=(2, 2), stride=2)
-#         self.upscale = Upsample(scale_factor=2, mode='nearest')
-#
-#         alpha_in, alpha_out = alpha[0], alpha[1]
-#         self.alpha_in, self.alpha_out = alpha_in, alpha_out
-#
-#         in_l_ch = int(alpha_in * in_ch)
-#         in_h_ch = in_ch - in_l_ch
-#         out_l_ch = int(alpha_out * out_ch)
-#         out_h_ch = out_ch - out_l_ch
-#
-#         self.conv_l2l = nn.Conv2d(in_l_ch, out_l_ch, ker_sz, 1, self.pad, dila, groups, bias) \
-#                         if alpha_in > 0 and alpha_out > 0 else None
-#
-#         self.conv_l2h = nn.Conv2d(in_l_ch, out_h_ch, ker_sz, 1, self.pad, dila, groups, bias) \
-#                         if alpha_in > 0 and alpha_out < 1 else None
-#
-#         self.conv_h2l = nn.Conv2d(in_h_ch, out_l_ch, ker_sz, 1, self.pad, dila, groups, bias) \
-#                         if alpha_in < 1 and alpha_out > 0 else None
-#
-#         self.conv_h2h = nn.Conv2d(in_h_ch, out_h_ch, ker_sz, 1, self.pad, dila, groups, bias) \
-#                         if alpha_in < 1 and alpha_out < 1 else None
-#
-#         self.h_norm2d = Identity()
-#         self.l_norm2d = Identity()
-#
-#         if isinstance(bias, _Callable):
-#             self.h_norm2d = nn.Sequential(bias(out_h_ch, **norm_kwargs), act)
-#             if alpha_out > 0:
-#                 self.l_norm2d = nn.Sequential(bias(out_l_ch, **norm_kwargs), act)
-#
-#     def oct_forward(self, x_h, x_l):
-#
-#         if self.alpha_in == 0:
-#             if self.stride > 1:
-#                 x_h = self.downscale(x_h)
-#             y_h2h = self.conv_h2h(x_h)
-#             if self.alpha_out > 0:
-#                 y_h2l = self.conv_h2l(self.downscale(x_h))
-#                 return y_h2h, y_h2l
-#             else:
-#                 return y_h2h, None
-#
-#         elif self.alpha_in > 0:
-#             if self.stride > 1:
-#                 x_h = self.downscale(x_h)
-#             y_h2h = self.conv_h2h(x_h)
-#             y_l2h = self.conv_l2h(x_l)
-#             if self.stride == 1:
-#                 y_l2h = self.upscale(y_l2h)
-#             y_h = y_h2h + y_l2h
-#             if self.alpha_out > 0:
-#                 y_h2l = self.conv_h2l(self.downscale(x_h))
-#                 if self.stride > 1:
-#                     x_l = self.downscale(x_l)
-#                 y_l2l = self.conv_l2l(x_l)
-#                 y_l = y_h2l + y_l2l
-#                 return y_h, y_l
-#             else:
-#                 return y_h, None
-#
-#     # @torch.jit.script_method
-#     def forward(self, x):
-#         x_h, x_l = x if isinstance(x, (tuple, list)) else (x, None)
-#
-#         y_h, y_l = self.oct_forward(x_h, x_l)
-#         y_h = self.h_norm2d(y_h)
-#         if y_l is not None:
-#             y_l = self.l_norm2d(y_l)
-#             return y_h, y_l
-#         return y_h
