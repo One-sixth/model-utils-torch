@@ -121,7 +121,7 @@ class AlterCosineLrScheduler(Scheduler):
                 factor = 1 - (cur_t - seg_mid) / (seg_end - seg_mid)
 
         # 获得学习率调整因子
-        cur_factor = math.cos(math.pi * factor * 0.5)
+        cur_factor = (math.cos(math.pi * factor) + 1) / 2
 
         if t < self.step_times[0]:
             lrs = [self.warmup_lr_init * cur_factor + lr_base * (1-cur_factor) for lr_base in self.base_values]
