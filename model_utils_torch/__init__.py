@@ -1,4 +1,9 @@
 '''
+v1.6
+新层 ScaleNorm，GradScale，GradScale2，SwiGLU
+新优化器 CAME
+新算子 grad_scale_2，root_mean_square
+
 v1.5
 T5_RelativePositionEmbedding 允许调整的起始位置和缩放
 增加新的损失函数 weighted_and_neg_topk_cross_entropy
@@ -56,4 +61,4 @@ from . import image
 from . import rev
 
 
-__version__ = '1.5'
+__version__ = '1.6'
