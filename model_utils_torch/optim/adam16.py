@@ -66,8 +66,8 @@ class Adam16(Optimizer):
                     grad = grad.add(group['weight_decay'], state['fp32_p'])
 
                 # Decay the first and second moment running average coefficient
-                exp_avg.mul_(beta1).add_(1 - beta1, grad)
-                exp_avg_sq.mul_(beta2).addcmul_(1 - beta2, grad, grad)
+                exp_avg.mul_(beta1).add_(grad, alpha=1-beta1)
+                exp_avg_sq.mul_(beta2).addcmul_(grad, grad, value=1-beta2)
 
                 denom = exp_avg_sq.sqrt().add_(group['eps'])
 
@@ -75,7 +75,7 @@ class Adam16(Optimizer):
                 bias_correction2 = 1 - beta2 ** state['step']
                 step_size = group['lr'] * math.sqrt(bias_correction2) / bias_correction1
 
-                state['fp32_p'].addcdiv_(-step_size, exp_avg, denom)
+                state['fp32_p'].addcdiv_(exp_avg, denom, value=-step_size)
                 p.data = state['fp32_p'].half()
 
         return loss

@@ -88,8 +88,8 @@ class TestLayers(unittest.TestCase):
             [1, 1, 1, 1, 1, 0],
         ], dtype=torch.bool)
 
-        k_self_mask = gen_nlp_self_attn_mask(k_mask, True)
-        qk_cross_mask = gen_nlp_cross_attn_mask(q_mask, k_mask, False)
+        k_self_mask = make_nlp_self_attn_mask(k_mask, True)
+        qk_cross_mask = make_nlp_cross_attn_mask(q_mask, k_mask, False)
 
         k_self_mask = torch.where(k_self_mask, 0, -torch.inf)
         qk_cross_mask = torch.where(qk_cross_mask, 0, -torch.inf)
@@ -111,3 +111,25 @@ class TestLayers(unittest.TestCase):
         m = T5_RelativePositionEmbedding(bidirectional=False)
         o = m(10, 20)
         self.assertTrue(True)
+
+    def test_ScaleNorm(self):
+        m = ScaleNorm()
+        x = torch.rand([3, 16, 5])
+        y = m(x)
+        self.assertTrue(y.shape == (3, 16, 5))
+
+    def test_GradScale(self):
+        m = GradScale()
+        x = torch.rand([3, 16, 5])
+        y = m(x)
+
+    def test_GradScale2(self):
+        m = GradScale2()
+        x = torch.rand([3, 16, 5])
+        y = m(x)
+
+    def test_SwiGLU(self):
+        m = SwiGLU(20, 2, 30, False)
+        x = torch.rand([3, 16, 20])
+        y = m(x)
+        self.assertTrue(y.shape == (3, 16, 30))

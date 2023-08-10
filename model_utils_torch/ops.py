@@ -9,10 +9,7 @@ from typing import Union
 # from .utils import *
 
 from typing import Tuple
-try:
-    from .more_ops import *
-except (ModuleNotFoundError, ImportError):
-    from more_ops import *
+from .more_ops import *
 
 
 @torch.jit.script
@@ -217,7 +214,19 @@ class _GradScaleOp(torch.autograd.Function):
         return grad_output * s, None
 
 
+# 梯度缩放，方法1，不能直接jit
 grad_scale = _GradScaleOp.apply
+
+
+@torch.jit.script
+def grad_scale_2(x, scale: float):
+    '''
+    梯度缩放，方法2，可以直接用于jit
+    :param x:
+    :param scale:
+    :return:
+    '''
+    return x * scale + x.detach() * (1-scale)
 
 
 @torch.jit.script
@@ -287,3 +296,16 @@ def apply_rotary_position_embedding(x, sin_pos_emb):
     o = o.flatten(-2)
     # o shape [..., L, C]
     return o
+
+
+@torch.jit.script
+def root_mean_square(x, dim: Union[None, list[int]], keepdim: bool, eps: float=1e-8):
+    '''
+    均方根
+    :param x:
+    :param dim:     可以是 None, List[int]
+    :param keepdim:
+    :param eps:
+    :return:
+    '''
+    return x.square().mean(dim=dim, keepdim=keepdim).add(eps).sqrt()

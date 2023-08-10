@@ -105,3 +105,8 @@ class TestOps(unittest.TestCase):
         x = torch.randn([2, len, pos_ch])
         out = apply_rotary_position_embedding(x, coord)
         self.assertTrue(True)
+
+    def test_root_mean_square(self):
+        x = torch.rand(3, 10, 5)
+        y = root_mean_square(x, [-1], keepdim=True)
+        self.assertTrue(y.shape==(3, 10, 1))

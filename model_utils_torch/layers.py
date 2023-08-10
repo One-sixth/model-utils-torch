@@ -10,19 +10,12 @@ import torch.jit
 
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
 import math
-from typing import Iterable as _Iterable
-from typing import Callable as _Callable
 
-try:
-    from . import ops
-    from . import utils
-    from .more_layers import *
-except (ModuleNotFoundError, ImportError):
-    import ops
-    import utils
-    from more_layers import *
+from . import ops
+from . import utils
+from .more_layers import *
+
 
 '''
 注意写 torch.jit.script 时需要手动添加非 Tensor 参数的注释
@@ -59,29 +52,6 @@ class Interpolate(torch.jit.ScriptModule):
             info = 'size=' + str(self.size)
         info += ', mode=' + self.mode
         return info
-
-
-# class Upsample(torch.jit.ScriptModule):
-#     __constants__ = ['size', 'scale_factor', 'mode', 'align_corners', 'name']
-#
-#     def __init__(self, size=None, scale_factor=None, mode='bilinear', align_corners=None):
-#         super().__init__()
-#
-#         # scale_factor 不允许是整数，有点坑。。
-#         if size is None:
-#             if isinstance(scale_factor, _Iterable):
-#                 scale_factor = tuple([float(i) for i in scale_factor])
-#             else:
-#                 scale_factor = float(scale_factor)
-#
-#         self.size = size
-#         self.scale_factor = scale_factor
-#         self.mode = mode
-#         self.align_corners = align_corners
-#
-#     @torch.jit.script_method
-#     def forward(self, x: torch.Tensor):
-#         return F.interpolate(x, self.size, self.scale_factor, self.mode, self.align_corners)
 
 
 Upsample = Interpolate
@@ -180,3 +150,91 @@ class InstanceReshape(torch.jit.ScriptModule):
 
     def extra_repr(self):
         return "{shape}".format(**self.__dict__)
+
+
+# class RmsNorm(torch.jit.ScriptModule):
+#     def __init__(self, in_feat, dim, eps=1e-8):
+#         super().__init__()
+#         self.weight = nn.Parameter(torch.ones(in_feat))
+#         self.dim = dim
+#         self.eps = eps
+#
+#     @torch.jit.script_method
+#     def forward(self, x: torch.Tensor):
+#         y = x / ops.root_mean_square(x, self.dim, True, self.eps) * self.weight
+#         return y
+
+
+class ScaleNorm(torch.jit.ScriptModule):
+    def __init__(self, scale=1., dim=-1, eps=1e-8):
+        super().__init__()
+        if isinstance(dim, int):
+            dim = (dim,)
+        assert dim is None or all([isinstance(i, int) for i in dim]), 'Error! 参数 dim 只允许 None，整数，整数列表'
+        self.dim = dim
+        self.weight = nn.Parameter(torch.as_tensor(scale))
+        self.eps = eps
+
+    @torch.jit.script_method
+    def forward(self, x: torch.Tensor):
+        y = x / ops.root_mean_square(x, self.dim, True, self.eps) * self.weight
+        return y
+
+
+class GradScale(nn.Module):
+    def __init__(self, scale=1.):
+        '''
+        梯度缩放，方法1，不能jit，可以等价替换为GradScale2从而允许jit
+        :param scale:
+        '''
+        super().__init__()
+        self.scale = scale
+
+    def forward(self, x):
+        if self.training:
+            return ops.grad_scale(x, self.scale)
+        else:
+            return x
+
+
+class GradScale2(torch.jit.ScriptModule):
+    def __init__(self, scale=1.):
+        '''
+        梯度缩放，方法2，可以直接jit
+        :param scale:
+        '''
+        super().__init__()
+        self.scale = scale
+
+    def forward(self, x):
+        if self.training:
+            return ops.grad_scale_2(x, self.scale)
+        else:
+            return x
+
+
+class SwiGLU(torch.jit.ScriptModule):
+    def __init__(self, in_feat, ffn_mul, out_feat=None, no_bias=False):
+        super().__init__()
+        assert in_feat * ffn_mul % 2 == 0
+        if out_feat is None:
+            out_feat = in_feat
+        hidden_dim = int(round(in_feat * ffn_mul))
+
+        # 注意，bias 可以有效帮助拟合，建议保留
+        self.layer1 = nn.Linear(in_feat, hidden_dim * 2, bias=not no_bias)
+        self.layer2 = nn.Linear(hidden_dim, out_feat, bias=not no_bias)
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        limit = 1 / math.sqrt(self.layer1.weight.shape[0])
+        nn.init.uniform_(self.layer1.weight, -limit, limit)
+        self.layer2.weight.data.zero_()
+
+    @torch.jit.script_method
+    def forward(self, x: torch.Tensor):
+        # x shape [B, L, C]
+        gate, feat = self.layer1(x).chunk(2, -1)
+        feat = F.silu(gate) * feat
+        out = self.layer2(feat)
+        return out

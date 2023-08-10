@@ -19,3 +19,9 @@ class TestOptim(unittest.TestCase):
         optim = Adan([p])
         p.sum().backward()
         optim.step()
+
+    def test_came(self):
+        p = torch.ones([1], dtype=torch.float32, requires_grad=True)
+        optim = CAME([p])
+        p.sum().backward()
+        optim.step()
