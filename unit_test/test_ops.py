@@ -110,3 +110,24 @@ class TestOps(unittest.TestCase):
         x = torch.rand(3, 10, 5)
         y = root_mean_square(x, [-1], keepdim=True)
         self.assertTrue(y.shape==(3, 10, 1))
+
+    def test_val2vec(self):
+        # 基数数组
+        base_arr = torch.tensor([10, 50, 100, 1000, 1500], dtype=torch.float32)
+        # 随机向量
+        vectors = torch.randn([len(base_arr), 8])
+
+        # 批处理输入
+        x = torch.tensor([-5, 5, 12, 70, 400, 500, 2400])
+
+        out_vecs, weights = compute_val2vec(x, base_arr, vectors)
+
+        non_zeros_1 = torch.argwhere(weights[0])[:, 0].tolist()
+        non_zeros_2 = torch.argwhere(weights[2])[:, 0].tolist()
+        non_zeros_3 = torch.argwhere(weights[6])[:, 0].tolist()
+
+        self.assertTrue(out_vecs.shape==(len(x), 8))
+        self.assertTrue(weights.shape==(len(x), len(base_arr)))
+        self.assertTrue(non_zeros_1==[0])
+        self.assertTrue(non_zeros_2==[0, 1])
+        self.assertTrue(non_zeros_3==[4])

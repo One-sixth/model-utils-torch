@@ -20,6 +20,7 @@ import torch.nn.functional as F
 import math
 import warnings
 from typing import Union, Callable
+from ..ops import make_sinusoidal_position_embedding, apply_rotary_position_embedding
 
 
 __all__ = ['FlashQuadCrossAttention', 'FlashQuadSelfAttention']
@@ -42,6 +43,9 @@ def flash_quad_cross_attention(q, k, v, attn_mul: _TensorOptional=None, attn_bia
     a = q @ k.transpose(-1, -2)
     # qk shape [B, Q, K]
 
+    # scale
+    a /= math.sqrt(q.shape[1] * k.shape[1])
+
     if attn_mul is not None:
         a *= attn_mul
 
@@ -60,6 +64,9 @@ def flash_quad_cross_attention(q, k, v, attn_mul: _TensorOptional=None, attn_bia
 def _get_norm(use_norm, in_dim):
     if use_norm == 'layernorm' or use_norm is True:
         norm = nn.LayerNorm(in_dim)
+    elif use_norm == 'layernorm_nobias':
+        norm = nn.LayerNorm(in_dim)
+        norm.register_parameter('bias', None)
     elif use_norm in [None, False, 'none', 'identity']:
         norm = nn.Identity()
     elif isinstance(use_norm, nn.Module):
@@ -74,7 +81,7 @@ def _get_norm(use_norm, in_dim):
 class FlashQuadCrossAttention(torch.jit.ScriptModule):
     __constants__ = ['use_skip', 'attn_act_fn']
 
-    def __init__(self, in_dim, out_dim, expand_dim, squeeze_dim, use_norm='layernorm', use_skip=True, attn_act_fn='laplacian'):
+    def __init__(self, in_dim, out_dim, expand_dim, squeeze_dim, use_norm='layernorm', use_skip=True, attn_act_fn='laplacian', use_rotary_pos_emb=False, linear_layer_nobias=False):
         super().__init__()
         warnings.warn(f'Warning! You are using the {self.__class__.__name__} temporary implementation.')
 
@@ -82,24 +89,25 @@ class FlashQuadCrossAttention(torch.jit.ScriptModule):
         self.attn_act_fn = attn_act_fn
         if use_skip:
             assert in_dim == out_dim
+        self.use_rotary_pos_emb = use_rotary_pos_emb
 
         self.norm = _get_norm(use_norm, in_dim)
         self.norm2 = _get_norm(use_norm, in_dim)
 
-        self.q_m = nn.Linear(in_dim, squeeze_dim)
-        self.k_m = nn.Linear(in_dim, squeeze_dim)
-        self.v_m = nn.Linear(in_dim, expand_dim)
-        self.u_m = nn.Linear(in_dim, expand_dim)
+        self.q_m = nn.Linear(in_dim, squeeze_dim, bias=not linear_layer_nobias)
+        self.k_m = nn.Linear(in_dim, squeeze_dim, bias=not linear_layer_nobias)
+        self.v_m = nn.Linear(in_dim, expand_dim, bias=not linear_layer_nobias)
+        self.u_m = nn.Linear(in_dim, expand_dim, bias=not linear_layer_nobias)
 
         self.q_gamma = nn.Parameter(torch.rand(squeeze_dim) / math.sqrt(squeeze_dim))
         self.q_bias = nn.Parameter(torch.zeros(squeeze_dim))
         self.k_gamma = nn.Parameter(torch.rand(squeeze_dim) / math.sqrt(squeeze_dim))
         self.k_bias = nn.Parameter(torch.zeros(squeeze_dim))
 
-        self.out = nn.Linear(expand_dim, out_dim)
+        self.out = nn.Linear(expand_dim, out_dim, bias=not linear_layer_nobias)
 
     @torch.jit.script_method
-    def forward(self, _q, _k, attn_mul: _TensorOptional=None, attn_bias: _TensorOptional=None):
+    def forward(self, _q, _k, attn_mul: _TensorOptional=None, attn_bias: _TensorOptional=None, rotary_pos_start: int=0, rotary_pos_scale: int=1):
         z1 = self.norm(_q)
         z2 = self.norm2(_k)
 
@@ -110,6 +118,12 @@ class FlashQuadCrossAttention(torch.jit.ScriptModule):
 
         q = q * self.q_gamma + self.q_bias
         k = k * self.k_gamma + self.k_bias
+
+        if self.use_rotary_pos_emb:
+            qL, kL = q.shape[1], k.shape[1]
+            pos_emb = make_sinusoidal_position_embedding(max(qL, kL), pos_ch=max(q.shape[2], k.shape[2]), pos_start=rotary_pos_start, pos_scale=rotary_pos_scale, device=q.device)
+            q = apply_rotary_position_embedding(q, pos_emb[:qL, :q.shape[2]])
+            k = apply_rotary_position_embedding(k, pos_emb[:kL, :k.shape[2]])
 
         y = u * flash_quad_cross_attention(q, k, v, attn_mul, attn_bias, self.attn_act_fn)
 
@@ -123,7 +137,7 @@ class FlashQuadCrossAttention(torch.jit.ScriptModule):
 class FlashQuadSelfAttention(torch.jit.ScriptModule):
     __constants__ = ['use_skip', 'attn_act_fn']
 
-    def __init__(self, in_dim, out_dim, expand_dim, squeeze_dim, use_norm='layernorm', use_skip=True, attn_act_fn='laplacian'):
+    def __init__(self, in_dim, out_dim, expand_dim, squeeze_dim, use_norm='layernorm', use_skip=True, attn_act_fn='laplacian', use_rotary_pos_emb=False, linear_layer_nobias=False):
         super().__init__()
         warnings.warn(f'Warning! You are using the {self.__class__.__name__} temporary implementation.')
 
@@ -131,22 +145,23 @@ class FlashQuadSelfAttention(torch.jit.ScriptModule):
         self.attn_act_fn = attn_act_fn
         if use_skip:
             assert in_dim == out_dim
+        self.use_rotary_pos_emb = use_rotary_pos_emb
 
         self.norm = _get_norm(use_norm, in_dim)
 
-        self.u_m = nn.Linear(in_dim, expand_dim)
-        self.v_m = nn.Linear(in_dim, expand_dim)
-        self.z_m = nn.Linear(in_dim, squeeze_dim)
+        self.u_m = nn.Linear(in_dim, expand_dim, bias=not linear_layer_nobias)
+        self.v_m = nn.Linear(in_dim, expand_dim, bias=not linear_layer_nobias)
+        self.z_m = nn.Linear(in_dim, squeeze_dim, bias=not linear_layer_nobias)
 
         self.q_gamma = nn.Parameter(torch.rand(squeeze_dim) / math.sqrt(squeeze_dim))
         self.q_bias = nn.Parameter(torch.zeros(squeeze_dim))
         self.k_gamma = nn.Parameter(torch.rand(squeeze_dim) / math.sqrt(squeeze_dim))
         self.k_bias = nn.Parameter(torch.zeros(squeeze_dim))
 
-        self.out = nn.Linear(expand_dim, out_dim)
+        self.out = nn.Linear(expand_dim, out_dim, bias=not linear_layer_nobias)
 
     @torch.jit.script_method
-    def forward(self, x, attn_mul: _TensorOptional=None, attn_bias: _TensorOptional=None):
+    def forward(self, x, attn_mul: _TensorOptional=None, attn_bias: _TensorOptional=None, rotary_pos_start: int=0, rotary_pos_scale: int=1):
         y = self.norm(x)
 
         u = self.u_m(y)
@@ -155,6 +170,12 @@ class FlashQuadSelfAttention(torch.jit.ScriptModule):
 
         q = z * self.q_gamma + self.q_bias
         k = z * self.k_gamma + self.k_bias
+
+        if self.use_rotary_pos_emb:
+            qL, kL = q.shape[1], k.shape[1]
+            pos_emb = make_sinusoidal_position_embedding(max(qL, kL), pos_ch=max(q.shape[2], k.shape[2]), pos_start=rotary_pos_start, pos_scale=rotary_pos_scale, device=q.device)
+            q = apply_rotary_position_embedding(q, pos_emb[:qL, :q.shape[2]])
+            k = apply_rotary_position_embedding(k, pos_emb[:kL, :k.shape[2]])
 
         y = u * flash_quad_cross_attention(q, k, v, attn_mul, attn_bias, self.attn_act_fn)
 
