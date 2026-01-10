@@ -3,9 +3,13 @@
 
 用浮点值在基数数组中寻找坐标，获得相对偏移权重，然后从向量集里选取向量
 从而实现类似 软分类嵌入的效果
+
+成份向量转浮点值功能
+模型输出一列成份值，对应每个基数的成份，只选最大成份值及旁边第二大成份值，将这两个成份值缩放到和为1。然后乘于基数，再求和，得到浮点值
 '''
 
 import torch
+import torch.nn.functional as F
 
 
 @torch.jit.script
@@ -104,7 +108,59 @@ def compute_val2vec(x: torch.Tensor, base_arr: torch.Tensor, vectors: torch.Tens
     return out, weights
 
 
-def test_compute_val2vec():
+@torch.jit.script
+def select_2max_pos_mask(x: torch.Tensor):
+    '''
+    从一列概率热值，先选最大热值的位置，然后选最大热值+1或-1位置中，选出第二大热值的位置，然后就保留这两个位置，然后制作掩码
+    例子：
+    输入：[0.5, 0.8, 0.2, 0.9, 0.4, 0.1]
+    输出：[0.,  0.,  0.,  1.,  1.,  0. ]
+    :param x:
+    :return:
+    '''
+    # 先填充两边，避免边界问题
+    x2 = F.pad(x, [1, 1], "constant", -torch.inf)
+    # 制作掩码
+    x2_mask = torch.zeros_like(x2, dtype=torch.bool)
+    # 找到最大值位置
+    pos = torch.argmax(x2, -1, keepdim=True)
+    # 找到前后的位置
+    pos2 = torch.cat([pos, pos+1, pos-1], -1)
+    # 裁剪边界
+    pos2 = torch.clamp_(pos2, 0, x2.shape[-1]-1)
+    # 设定 mask
+    x2_mask.scatter_(-1, pos2, True)
+    # 把 mask 以外的区域设置为 inf
+    x2 = torch.where(torch.logical_not(x2_mask), torch.inf, x2)
+    # 寻找最小值位置
+    pos3 = x2.argmin(-1, keepdim=True)
+    # 屏蔽最小值
+    x2_mask.scatter_(-1, pos3, False)
+    # x2 *= x2_mask
+    # 转换成01掩码
+    x2_mask = x2_mask[..., 1:-1].clone().type(torch.float32)
+    return x2_mask
+
+
+@torch.jit.script
+def compute_heat2val(heat_vec: torch.Tensor, base_arr: torch.Tensor):
+    '''
+    将向量转换为值，是上面compute_val2vec的逆向转换
+    :param heat_vec:    输入热值向量，值应该都在 0-1 之间
+    :param base_arr:    基数数组
+    :return:
+    '''
+    # 找到最大成份值的位置
+    mask = select_2max_pos_mask(heat_vec)
+    mask_vec = heat_vec * mask
+    # 使向量和为1
+    mask_vec = mask_vec / mask_vec.sum(-1, keepdim=True)
+    # 获得浮点值
+    out = (mask_vec * base_arr).sum(-1)
+    return out
+
+
+def try_compute_val2vec():
     print("\n=== val2vec 测试 ===")
 
     # 基数数组
@@ -130,5 +186,21 @@ def test_compute_val2vec():
         print(f"  权重值: {non_zero_vals.tolist()}")
 
 
+def try_compute_heat2val():
+    print("\n=== heat2val 测试 ===")
+
+    # 基数数组
+    base_arr = torch.tensor([10, 50, 100, 1000, 1500, 2500], dtype=torch.float32)
+    # 随机生成向量
+    heat_vec = torch.tensor([
+        [0.3, 0.6, 0., 0., 0., 0.],
+        [0., 0.6, 0., 0., 0.9, 0.3],
+    ])
+
+    value = compute_heat2val(heat_vec, base_arr)
+    print(f"heat2val 输出值 {value.tolist()}, 正确值 [36.67, 1,750]")
+
+
 if __name__ == "__main__":
-    test_compute_val2vec()
+    try_compute_val2vec()
+    try_compute_heat2val()

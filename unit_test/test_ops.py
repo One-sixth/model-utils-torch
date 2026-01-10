@@ -131,3 +131,25 @@ class TestOps(unittest.TestCase):
         self.assertTrue(non_zeros_1==[0])
         self.assertTrue(non_zeros_2==[0, 1])
         self.assertTrue(non_zeros_3==[4])
+
+    def test_heat2val(self):
+        # 基数数组
+        base_arr = torch.tensor([10, 50, 100, 1000, 1500, 2500], dtype=torch.float32)
+        # 随机生成向量
+        heat_vec = torch.tensor([
+            [0.3, 0.6, 0., 0., 0., 0.],
+            [0., 0.6, 0., 0., 0.9, 0.3],
+        ])
+
+        value = compute_heat2val(heat_vec, base_arr)
+        self.assertTrue(torch.all(value - torch.tensor([36.67, 1750.]) < 0.1))
+
+    def test_sinkhorn_knopp_add(self):
+        M = torch.randn([10, 128, 128])
+        M_exp = M.exp()
+        M_inv = sinkhorn_knopp_add(M_exp, 20)
+        M_out = M_exp + M_inv
+        M_row = M_out.sum(dim=1)
+        M_col = M_out.sum(dim=2)
+        self.assertTrue(torch.allclose(M_row, torch.ones_like(M_row), atol=1e-7))
+        self.assertTrue(torch.allclose(M_col, torch.ones_like(M_col), atol=1e-7))

@@ -309,3 +309,28 @@ def root_mean_square(x, dim: Union[None, list[int]], keepdim: bool, eps: float=1
     :return:
     '''
     return x.square().mean(dim=dim, keepdim=keepdim).add(eps).sqrt()
+
+
+@torch.jit.script
+def sinkhorn_knopp_add(M_raw: torch.Tensor, it: int=20, eps: float=1e-8):
+    '''
+    将输入变成双随机矩阵的差，加上原来的值就能使原值变成双随机矩阵
+    输入必须是正数
+    注意，该函数不可求导
+    :param M_raw:   输入矩阵必须是正数，至少有两个维度
+    :param it:      迭代次数，最多20次足矣
+    :param eps:     防止除0
+    :return:
+    '''
+    # M_raw 需要全都是正数，可以用 exp 变成正数
+    # 阻止梯度传递
+    M = M_raw.detach()
+
+    for _ in range(it):
+        # 行归一化 T_r
+        M = M / (M.sum(dim=-1, keepdim=True) + eps)
+        # 列归一化 T_c
+        M = M / (M.sum(dim=-2, keepdim=True) + eps)
+
+    M_inv = M - M_raw
+    return M_inv
